@@ -112,6 +112,35 @@ URGENCY_TYPES = [
     'Immediate/Resus'
 ]
 
+TIME_OF_DAY = [
+    'Morning',
+    'Afternoon',
+    'Evening',
+    'Night'
+]
+
+ANAESTHETIC_TYPES = [
+    'GA + ETT',
+    'GA + LMA',
+    'GA + i-gel',
+    'GA + Supraglottic airway',
+    'GA + Face mask',
+    'TIVA + ETT',
+    'TIVA + LMA',
+    'TIVA + i-gel',
+    'Spinal',
+    'Epidural',
+    'CSE (Combined Spinal-Epidural)',
+    'Regional block + sedation',
+    'Regional block alone',
+    'Local anaesthetic + sedation',
+    'Sedation only',
+    'MAC (Monitored Anaesthetic Care)',
+    'Awake fibreoptic intubation',
+    'RSI',
+    'Other'
+]
+
 OPERATION_TYPES = [
     'General Surgery',
     'Orthopaedic',
@@ -356,7 +385,7 @@ def format_case_for_export(case):
     # Date and time
     date_str = f"Date: {case['date']}"
     if case.get('time'):
-        date_str += f" at {case['time']}"
+        date_str += f" ({case['time']})"
     lines.append(date_str)
     
     # Patient details
@@ -373,6 +402,8 @@ def format_case_for_export(case):
         lines.append(f"Urgency: {case['urgency']}")
     if case.get('operation_type'):
         lines.append(f"Operation Type: {case['operation_type']}")
+    if case.get('anaesthetic_type'):
+        lines.append(f"Anaesthetic Type: {case['anaesthetic_type']}")
     
     # Case type and procedure
     if case.get('case_type'):
@@ -670,9 +701,10 @@ Provide a helpful, concise answer for my training level."""
                 )
             
             with col2:
-                case_time = st.time_input(
-                    "Time (optional)",
-                    value=datetime.strptime(existing_case.get('time', '12:00'), '%H:%M').time() if existing_case.get('time') else None
+                time_of_day = st.selectbox(
+                    "Time of Day",
+                    [''] + TIME_OF_DAY,
+                    index=TIME_OF_DAY.index(existing_case.get('time', '')) + 1 if existing_case.get('time') in TIME_OF_DAY else 0
                 )
             
             col1, col2 = st.columns(2)
@@ -706,6 +738,12 @@ Provide a helpful, concise answer for my training level."""
                     [''] + OPERATION_TYPES,
                     index=OPERATION_TYPES.index(existing_case.get('operation_type', '')) + 1 if existing_case.get('operation_type') in OPERATION_TYPES else 0
                 )
+            
+            anaesthetic_type = st.selectbox(
+                "Anaesthetic Type",
+                [''] + ANAESTHETIC_TYPES,
+                index=ANAESTHETIC_TYPES.index(existing_case.get('anaesthetic_type', '')) + 1 if existing_case.get('anaesthetic_type') in ANAESTHETIC_TYPES else 0
+            )
             
             case_type = st.selectbox(
                 "Case Type (optional)",
@@ -835,11 +873,12 @@ Provide a helpful, concise answer for my training level."""
                 case_data = {
                     'assessment_type': st.session_state.assessment_type,
                     'date': case_date.isoformat(),
-                    'time': case_time.strftime('%H:%M') if case_time else '',
+                    'time': time_of_day,
                     'age_category': age_category,
                     'asa_grade': asa_grade,
                     'urgency': urgency,
                     'operation_type': operation_type,
+                    'anaesthetic_type': anaesthetic_type,
                     'case_type': case_type,
                     'procedure': procedure,
                     'supervisor': supervisor,
@@ -897,7 +936,7 @@ else:
                 <div class="{card_class}">
                     <div style="margin-bottom: 0.5rem;">
                         <span style="color: #667eea; font-weight: 600; font-size: 0.9rem;">
-                            {case['date']} {case.get('time', '')}
+                            {case['date']}{' (' + case.get('time', '') + ')' if case.get('time') else ''}
                         </span>
                         <span class="badge badge-{status_badge}">{status_text}</span>
                         <span style="background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; margin-left: 0.5rem;">
@@ -909,7 +948,8 @@ else:
                     </h3>
                     <p style="color: #6b7280; font-size: 0.9rem; margin: 0.25rem 0;">
                         {case.get('urgency', '')}{'  •  ' if case.get('urgency') and case.get('operation_type') else ''}{case.get('operation_type', '')}
-                        {' • ' if (case.get('urgency') or case.get('operation_type')) and case.get('age_category') else ''}{case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
+                        {' • ' if case.get('anaesthetic_type') and (case.get('urgency') or case.get('operation_type')) else ''}{case.get('anaesthetic_type', '')}
+                        {' • ' if (case.get('urgency') or case.get('operation_type') or case.get('anaesthetic_type')) and case.get('age_category') else ''}{case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
                         {' • ' + case.get('supervisor', '') if case.get('supervisor') else ''}
                     </p>
                 </div>
