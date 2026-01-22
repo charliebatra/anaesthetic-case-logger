@@ -120,25 +120,32 @@ TIME_OF_DAY = [
 ]
 
 ANAESTHETIC_TYPES = [
-    'GA + ETT',
-    'GA + LMA',
-    'GA + i-gel',
-    'GA + Supraglottic airway',
-    'GA + Face mask',
-    'TIVA + ETT',
-    'TIVA + LMA',
-    'TIVA + i-gel',
+    'GA - ETT (LMA/SGA if failed)',
+    'GA - LMA/SGA',
+    'GA - Face mask',
+    'TIVA - ETT',
+    'TIVA - LMA/SGA',
     'Spinal',
     'Epidural',
-    'CSE (Combined Spinal-Epidural)',
-    'Regional block + sedation',
-    'Regional block alone',
-    'Local anaesthetic + sedation',
-    'Sedation only',
-    'MAC (Monitored Anaesthetic Care)',
+    'CSE',
+    'Regional block (single shot)',
+    'Regional block (catheter)',
+    'Regional + sedation',
+    'Regional + GA',
+    'Local anaesthetic infiltration',
+    'Sedation (conscious)',
+    'Sedation (deep)',
+    'MAC',
     'Awake fibreoptic intubation',
-    'RSI',
     'Other'
+]
+
+SUPERVISION_LEVELS = [
+    'Observed (Level 1)',
+    'Supervised - Hands on (Level 2)',
+    'Supervised - Distant (Level 3a)',
+    'Supervised - Immediately available (Level 3b)',
+    'Autonomous (Level 4)'
 ]
 
 OPERATION_TYPES = [
@@ -411,6 +418,9 @@ def format_case_for_export(case):
     if case.get('anaesthetic_type'):
         lines.append(f"Anaesthetic: {case['anaesthetic_type']}")
     
+    if case.get('supervision_level'):
+        lines.append(f"Role/Supervision: {case['supervision_level']}")
+    
     # Procedure
     if case.get('procedure'):
         lines.append(f"Procedure: {case['procedure']}")
@@ -628,7 +638,7 @@ if st.session_state.show_form:
         
         # AI Helper Section (outside form)
         with st.expander("🤖 AI Assistant - Get Help Writing", expanded=False):
-            st.info("**How to use:** Enter your Anthropic API key below, fill in case details, then generate text. Copy the AI output and paste it into the form fields.")
+            st.info("**How to use:** Enter your Anthropic API key below, fill in case details (💡 Tip: Click in text fields and use your keyboard's voice input!), then generate text. Copy the AI output and paste it into the form fields.")
             
             # API Key input
             st.markdown("**🔑 API Key Setup**")
@@ -652,6 +662,7 @@ if st.session_state.show_form:
                 st.success("✅ API key saved! AI features are ready to use.")
             
             st.markdown("---")
+            st.markdown("**🎤 Voice Input Available!** On mobile: Tap text field → tap microphone on keyboard. On desktop: Use your OS voice input (Windows: Win+H, Mac: Fn twice)")
             
             st.text_input("What case are you documenting?", key="ai_case_summary", placeholder="e.g., 'Emergency laparotomy, ASA 3 patient, RSI done'")
             st.text_area("What are your key notes?", key="ai_notes_input", height=80, placeholder="Brief case details, challenges, what you did...")
@@ -760,6 +771,12 @@ Provide a helpful, concise answer for my training level."""
                 "Anaesthetic Type",
                 [''] + ANAESTHETIC_TYPES,
                 index=ANAESTHETIC_TYPES.index(existing_case.get('anaesthetic_type', '')) + 1 if existing_case.get('anaesthetic_type') in ANAESTHETIC_TYPES else 0
+            )
+            
+            supervision_level = st.selectbox(
+                "Your Role / Supervision Level",
+                [''] + SUPERVISION_LEVELS,
+                index=SUPERVISION_LEVELS.index(existing_case.get('supervision_level', '')) + 1 if existing_case.get('supervision_level') in SUPERVISION_LEVELS else 0
             )
             
             case_type = st.selectbox(
@@ -896,6 +913,7 @@ Provide a helpful, concise answer for my training level."""
                     'urgency': urgency,
                     'operation_type': operation_type,
                     'anaesthetic_type': anaesthetic_type,
+                    'supervision_level': supervision_level,
                     'case_type': case_type,
                     'procedure': procedure,
                     'supervisor': supervisor,
@@ -967,13 +985,15 @@ else:
                         {case.get('urgency', '')}{'  •  ' if case.get('urgency') and case.get('operation_type') else ''}{case.get('operation_type', '')}
                         {' • ' if case.get('anaesthetic_type') and (case.get('urgency') or case.get('operation_type')) else ''}{case.get('anaesthetic_type', '')}
                         {' • ' if (case.get('urgency') or case.get('operation_type') or case.get('anaesthetic_type')) and case.get('age_category') else ''}{case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
-                        {' • ' + case.get('supervisor', '') if case.get('supervisor') else ''}
+                    </p>
+                    <p style="color: #6b7280; font-size: 0.85rem; margin: 0.25rem 0; font-style: italic;">
+                        {case.get('supervision_level', '')}{' • ' if case.get('supervision_level') and case.get('supervisor') else ''}{case.get('supervisor', '')}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
-                col_a, col_b, col_c, col_d = st.columns(4)
+                col_a, col_b, col_c, col_d, col_e = st.columns(5)
                 with col_a:
                     if st.button("✓", key=f"complete_{case['id']}", help="Toggle complete"):
                         toggle_complete(case['id'])
@@ -984,6 +1004,17 @@ else:
                         st.session_state.show_form = True
                         st.rerun()
                 with col_c:
+                    if st.button("📋", key=f"duplicate_{case['id']}", help="Duplicate case"):
+                        # Create a duplicate with new ID and date
+                        duplicate = case.copy()
+                        duplicate['id'] = int(datetime.now().timestamp() * 1000)
+                        duplicate['date'] = date.today().isoformat()
+                        duplicate['completed'] = False
+                        st.session_state.cases.append(duplicate)
+                        save_data()
+                        st.success("Case duplicated! Edit the new case to update details.")
+                        st.rerun()
+                with col_d:
                     # Export this case button
                     case_export = format_case_for_export(case)
                     st.download_button(
@@ -994,7 +1025,7 @@ else:
                         key=f"export_{case['id']}",
                         help="Export this case"
                     )
-                with col_d:
+                with col_e:
                     if st.button("🗑️", key=f"delete_{case['id']}", help="Delete case"):
                         delete_case(case['id'])
                         st.rerun()
