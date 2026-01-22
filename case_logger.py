@@ -383,80 +383,233 @@ COMMON_PROCEDURES = [
     'Post-op Review'
 ]
 
-# Comprehensive surgical procedures for autocomplete
-SURGICAL_PROCEDURES = [
-    'Appendicectomy (open)',
-    'Appendicectomy (laparoscopic)',
-    'Laparoscopic cholecystectomy',
-    'Open cholecystectomy',
-    'Hernia repair (inguinal)',
-    'Hernia repair (umbilical)',
-    'Hernia repair (incisional)',
-    'Laparotomy (emergency)',
-    'Laparotomy (elective)',
-    'Bowel resection',
-    'Colectomy',
-    'Hartmann\'s procedure',
-    'Anterior resection',
-    'Small bowel resection',
-    'Perforated viscus repair',
-    'Hip replacement (total)',
-    'Hip replacement (hemi)',
-    'Knee replacement',
-    'ORIF (open reduction internal fixation)',
-    'Intramedullary nail',
-    'Fracture fixation',
-    'Dynamic hip screw',
-    'Trauma laparotomy',
-    'Caesarean section',
-    'Category 1 caesarean section',
-    'Category 2 caesarean section',
-    'Category 3 caesarean section',
-    'Category 4 caesarean section',
-    'Manual removal of placenta',
-    'Cervical cerclage',
-    'ERPC (evacuation retained products)',
-    'Hysterectomy (total abdominal)',
-    'Hysterectomy (vaginal)',
-    'Ovarian cystectomy',
-    'Salpingectomy',
-    'Diagnostic laparoscopy',
-    'Cystoscopy',
-    'TURP (transurethral resection prostate)',
-    'TURBT (transurethral resection bladder tumour)',
-    'Nephrectomy',
-    'Ureteric stent insertion',
-    'Percutaneous nephrolithotomy',
-    'Tonsillectomy',
-    'Adenoidectomy',
-    'Septoplasty',
-    'Microlaryngoscopy',
-    'Thyroidectomy',
-    'Parathyroidectomy',
-    'Mastectomy',
-    'Wide local excision (breast)',
-    'Axillary clearance',
-    'Sentinel lymph node biopsy',
-    'Varicose vein surgery',
-    'Carotid endarterectomy',
-    'AAA repair (open)',
-    'AAA repair (EVAR)',
-    'Fem-pop bypass',
-    'Embolectomy',
-    'Fasciotomy',
-    'Craniotomy',
-    'Burr holes',
-    'VP shunt insertion',
-    'Spinal decompression',
-    'Spinal fusion',
-    'Carpal tunnel decompression',
-    'Trigger finger release',
-    'Examination under anaesthesia (EUA)',
-    'Incision and drainage',
-    'Debridement',
-    'Skin graft',
-    'Dental extraction'
-]
+# Procedures organized by specialty for filtered dropdown
+PROCEDURES_BY_SPECIALTY = {
+    'General Surgery': [
+        'Appendicectomy (open)',
+        'Appendicectomy (laparoscopic)',
+        'Laparoscopic cholecystectomy',
+        'Open cholecystectomy',
+        'Inguinal hernia repair',
+        'Umbilical hernia repair',
+        'Incisional hernia repair',
+        'Laparoscopic hernia repair',
+        'Emergency laparotomy',
+        'Laparotomy (elective)',
+        'Small bowel resection',
+        'Right hemicolectomy',
+        'Left hemicolectomy',
+        'Anterior resection',
+        'Hartmann\'s procedure',
+        'Abdominoperineal resection',
+        'Adhesiolysis',
+        'Perforated viscus repair',
+        'Gastrectomy',
+        'Oesophagectomy',
+        'Whipple\'s procedure',
+        'Splenectomy',
+        'Thyroidectomy',
+        'Parathyroidectomy',
+        'Mastectomy',
+        'Wide local excision (breast)',
+        'Axillary clearance',
+        'Sentinel node biopsy',
+        'Incision and drainage',
+        'Abscess drainage',
+        'Wound debridement',
+    ],
+    'Orthopaedics': [
+        'Total hip replacement (THR)',
+        'Hemiarthroplasty (hip)',
+        'Total knee replacement (TKR)',
+        'Dynamic hip screw (DHS)',
+        'Intramedullary nail (femur)',
+        'Intramedullary nail (tibia)',
+        'ORIF (open reduction internal fixation)',
+        'ORIF ankle',
+        'ORIF wrist',
+        'ORIF humerus',
+        'ORIF femur',
+        'ORIF tibia',
+        'External fixation',
+        'Knee arthroscopy',
+        'ACL reconstruction',
+        'Meniscectomy',
+        'Shoulder arthroscopy',
+        'Rotator cuff repair',
+        'Carpal tunnel decompression',
+        'Trigger finger release',
+        'Dupuytren\'s contracture release',
+        'Hand surgery',
+        'Manipulation under anaesthesia (MUA)',
+        'Spinal fusion',
+        'Laminectomy',
+        'Discectomy',
+        'Spinal decompression',
+        'Amputation (above knee)',
+        'Amputation (below knee)',
+    ],
+    'Obstetrics': [
+        'Caesarean section (Category 1)',
+        'Caesarean section (Category 2)',
+        'Caesarean section (Category 3)',
+        'Caesarean section (Category 4)',
+        'Caesarean section (elective)',
+        'Manual removal of placenta',
+        'Examination under anaesthesia',
+        'Perineal repair',
+        'Cervical cerclage',
+        'Labour epidural',
+        'Spinal for caesarean section',
+        'Combined spinal-epidural (labour)',
+    ],
+    'Gynaecology': [
+        'Total abdominal hysterectomy',
+        'Vaginal hysterectomy',
+        'Laparoscopic hysterectomy',
+        'Ovarian cystectomy',
+        'Salpingectomy',
+        'Salpingo-oophorectomy',
+        'Myomectomy',
+        'ERPC (evacuation retained products)',
+        'Hysteroscopy',
+        'D&C (dilation and curettage)',
+        'Diagnostic laparoscopy',
+        'Laparoscopy and dye test',
+        'Laparoscopic sterilisation',
+        'Endometrial ablation',
+        'LLETZ',
+        'Colposcopy',
+        'Anterior repair',
+        'Posterior repair',
+        'TVT procedure',
+        'TOT procedure',
+    ],
+    'Urology': [
+        'TURP (transurethral resection prostate)',
+        'TURBT (transurethral resection bladder tumour)',
+        'Cystoscopy',
+        'Ureteroscopy',
+        'Ureteric stent insertion',
+        'Nephrectomy',
+        'Partial nephrectomy',
+        'Radical prostatectomy',
+        'Percutaneous nephrolithotomy (PCNL)',
+        'Circumcision',
+        'Orchidectomy',
+        'Orchidopexy',
+        'Hydrocele repair',
+        'Vasectomy',
+        'Urethral dilatation',
+    ],
+    'Vascular': [
+        'AAA repair (open)',
+        'EVAR (endovascular aneurysm repair)',
+        'Carotid endarterectomy',
+        'Femoral-popliteal bypass',
+        'Femoral-distal bypass',
+        'AV fistula formation',
+        'AV fistula revision',
+        'Varicose vein surgery',
+        'Embolectomy',
+        'Thrombectomy',
+        'Fasciotomy',
+        'Amputation (vascular)',
+    ],
+    'ENT': [
+        'Tonsillectomy',
+        'Adenoidectomy',
+        'Adenotonsillectomy',
+        'Septoplasty',
+        'FESS (functional endoscopic sinus surgery)',
+        'Microlaryngoscopy',
+        'Panendoscopy',
+        'Thyroidectomy',
+        'Parathyroidectomy',
+        'Neck dissection',
+        'Myringotomy and grommets',
+        'Mastoidectomy',
+        'Stapedectomy',
+        'Submandibular gland excision',
+        'Parotidectomy',
+    ],
+    'Maxillofacial': [
+        'Dental extraction',
+        'Wisdom teeth extraction',
+        'Multiple dental extractions',
+        'Mandibular fracture ORIF',
+        'Maxillary fracture ORIF',
+        'Zygoma fracture ORIF',
+        'Le Fort fracture repair',
+        'TMJ arthroscopy',
+    ],
+    'Plastics': [
+        'Skin graft',
+        'Split skin graft',
+        'Full thickness graft',
+        'Flap surgery',
+        'Free flap',
+        'Carpal tunnel release',
+        'Dupuytren\'s contracture release',
+        'Hand fracture ORIF',
+        'Tendon repair',
+        'Burn debridement',
+        'Escharotomy',
+        'Breast reconstruction',
+        'Cleft lip repair',
+        'Cleft palate repair',
+    ],
+    'Neurosurgery': [
+        'Craniotomy',
+        'Craniectomy',
+        'Burr holes',
+        'EVD insertion',
+        'VP shunt insertion',
+        'VP shunt revision',
+        'Spinal decompression',
+        'Spinal fusion',
+        'Discectomy',
+        'Laminectomy',
+        'Acoustic neuroma excision',
+        'Pituitary surgery',
+    ],
+    'Cardiothoracic': [
+        'CABG (coronary artery bypass)',
+        'Valve replacement (AVR)',
+        'Valve replacement (MVR)',
+        'Valve repair',
+        'ASD closure',
+        'VSD closure',
+        'Lobectomy',
+        'Pneumonectomy',
+        'VATS (video-assisted thoracoscopic surgery)',
+        'Mediastinoscopy',
+        'Pleurodesis',
+        'Chest drain insertion',
+        'Thoracotomy',
+    ],
+    'Paediatric': [
+        'Circumcision',
+        'Herniotomy',
+        'Orchidopexy',
+        'Hypospadias repair',
+        'Pyloromyotomy',
+        'Intussusception reduction',
+        'Appendicectomy (paediatric)',
+        'Tonsillectomy (paediatric)',
+        'Adenoidectomy (paediatric)',
+        'Myringotomy and grommets',
+    ],
+}
+
+# Create flat list of all procedures for "Other" specialty option
+ALL_SURGICAL_PROCEDURES = []
+for procedures in PROCEDURES_BY_SPECIALTY.values():
+    ALL_SURGICAL_PROCEDURES.extend(procedures)
+ALL_SURGICAL_PROCEDURES = sorted(list(set(ALL_SURGICAL_PROCEDURES)))  # Remove duplicates and sort
+
+# Specialty list
+SPECIALTIES = sorted(list(PROCEDURES_BY_SPECIALTY.keys()))
 
 # EPA suggestions for different assessment types
 EPA_SUGGESTIONS = {
@@ -1265,11 +1418,19 @@ Provide a helpful, concise answer for my training level."""
                 )
             
             with col2:
-                operation_type = st.selectbox(
-                    "Operation Type",
-                    [''] + OPERATION_TYPES,
-                    index=OPERATION_TYPES.index(existing_case.get('operation_type', '')) + 1 if existing_case.get('operation_type') in OPERATION_TYPES else 0
+                # Specialty selector (replaces operation_type, now stored as operation_type for backward compatibility)
+                specialty = st.selectbox(
+                    "Surgical Specialty",
+                    [''] + SPECIALTIES + ['Anaesthetic Procedure', 'Other'],
+                    index=SPECIALTIES.index(existing_case.get('operation_type', '')) + 1 if existing_case.get('operation_type') in SPECIALTIES else (
+                        len(SPECIALTIES) + 1 if existing_case.get('operation_type') == 'Anaesthetic Procedure' else (
+                            len(SPECIALTIES) + 2 if existing_case.get('operation_type') == 'Other' else 0
+                        )
+                    ),
+                    help="Select specialty to filter procedures"
                 )
+                # Store as operation_type for compatibility
+                operation_type = specialty
             
             anaesthetic_type = st.selectbox(
                 "Anaesthetic Type",
@@ -1289,22 +1450,41 @@ Provide a helpful, concise answer for my training level."""
                 index=CASE_TYPES.index(existing_case.get('case_type', '')) + 1 if existing_case.get('case_type') in CASE_TYPES else 0
             )
             
-            # Procedure with searchable dropdown
+            # Procedure dropdown - filtered by specialty
             st.markdown("**Procedure Performed**")
-            all_procedures = sorted(COMMON_PROCEDURES + SURGICAL_PROCEDURES)
+            
+            # Determine which procedures to show based on specialty
+            if specialty == 'Anaesthetic Procedure':
+                available_procedures = COMMON_PROCEDURES
+                help_text = "Anaesthetic procedures (lines, blocks, etc.)"
+            elif specialty and specialty != 'Other' and specialty in PROCEDURES_BY_SPECIALTY:
+                available_procedures = PROCEDURES_BY_SPECIALTY[specialty]
+                help_text = f"Procedures filtered for {specialty}"
+            elif specialty == 'Other':
+                available_procedures = ALL_SURGICAL_PROCEDURES
+                help_text = "All surgical procedures - please select specialty above to filter"
+            else:
+                # No specialty selected - show limited options
+                available_procedures = ['Please select a specialty first']
+                help_text = "Select a specialty above to see procedures"
+            
+            # Sort and add to dropdown
+            if available_procedures != ['Please select a specialty first']:
+                available_procedures = sorted(available_procedures)
+            
             procedure = st.selectbox(
                 "Select or type procedure (searchable)",
-                [''] + all_procedures + ['Other (type below)'],
-                index=all_procedures.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in all_procedures else 0,
+                [''] + available_procedures + ['Other (type below)'],
+                index=available_procedures.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in available_procedures else 0,
                 label_visibility="collapsed",
-                help="Start typing to search procedures"
+                help=help_text
             )
             
-            # If "Other" selected, show text input
-            if procedure == 'Other (type below)':
+            # If "Other" selected or typing custom, show text input
+            if procedure == 'Other (type below)' or procedure == 'Please select a specialty first':
                 procedure = st.text_input(
                     "Enter procedure name",
-                    value=existing_case.get('procedure', '') if existing_case.get('procedure') not in all_procedures else '',
+                    value=existing_case.get('procedure', '') if existing_case.get('procedure') not in available_procedures else '',
                     placeholder="Type procedure name",
                     label_visibility="collapsed"
                 )
