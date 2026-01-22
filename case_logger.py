@@ -371,43 +371,47 @@ def export_cases(cases_to_export):
     return '\n'.join(output)
 
 def format_case_for_export(case):
-    """Format a single case for export with only populated fields"""
+    """Format a single case for export optimized for LLP copy/paste"""
     lines = []
-    lines.append("=" * 60)
-    lines.append(f"CASE DOCUMENTATION")
-    lines.append("=" * 60)
     
-    # Assessment type
-    if case.get('assessment_type'):
-        assessment_label = ASSESSMENT_TYPES.get(case['assessment_type'], 'Clinical Case')
-        lines.append(f"\nType: {assessment_label}")
+    # Title section - clear and concise
+    lines.append("=" * 70)
+    assessment_label = ASSESSMENT_TYPES.get(case.get('assessment_type', 'case'), 'Clinical Case')
+    lines.append(f"{assessment_label.upper()}")
+    lines.append("=" * 70)
     
-    # Date and time
-    date_str = f"Date: {case['date']}"
-    if case.get('time'):
-        date_str += f" ({case['time']})"
-    lines.append(date_str)
+    # Core case details in LLP-friendly format
+    lines.append("")
+    lines.append("CASE DETAILS")
+    lines.append("-" * 70)
     
-    # Patient details
-    patient_details = []
+    # Date/Time
+    if case.get('date'):
+        date_display = case['date']
+        if case.get('time'):
+            date_display += f" ({case['time']})"
+        lines.append(f"Date: {date_display}")
+    
+    # Patient info (anonymized as LLP requires)
+    patient_info = []
     if case.get('age_category'):
-        patient_details.append(case['age_category'])
+        patient_info.append(f"Age: {case['age_category']}")
     if case.get('asa_grade'):
-        patient_details.append(f"ASA {case['asa_grade']}")
-    if patient_details:
-        lines.append(f"Patient: {', '.join(patient_details)}")
+        patient_info.append(f"ASA: {case['asa_grade']}")
+    if patient_info:
+        lines.append(", ".join(patient_info))
     
-    # Urgency and operation type
+    # Case classification
     if case.get('urgency'):
         lines.append(f"Urgency: {case['urgency']}")
-    if case.get('operation_type'):
-        lines.append(f"Operation Type: {case['operation_type']}")
-    if case.get('anaesthetic_type'):
-        lines.append(f"Anaesthetic Type: {case['anaesthetic_type']}")
     
-    # Case type and procedure
-    if case.get('case_type'):
-        lines.append(f"Case Type: {case['case_type']}")
+    if case.get('operation_type'):
+        lines.append(f"Specialty: {case['operation_type']}")
+    
+    if case.get('anaesthetic_type'):
+        lines.append(f"Anaesthetic: {case['anaesthetic_type']}")
+    
+    # Procedure
     if case.get('procedure'):
         lines.append(f"Procedure: {case['procedure']}")
     
@@ -415,45 +419,58 @@ def format_case_for_export(case):
     if case.get('supervisor'):
         lines.append(f"Supervisor: {case['supervisor']}")
     
-    # Notes
+    # Clinical notes
     if case.get('notes'):
-        lines.append(f"\n{'CLINICAL NOTES':─^60}")
+        lines.append("")
+        lines.append("CLINICAL NOTES")
+        lines.append("-" * 70)
         lines.append(case['notes'])
     
-    # CBD scores
+    # Assessment-specific sections
     if case.get('cbd_scores'):
         has_scores = any(score for score in case['cbd_scores'].values())
         if has_scores:
-            lines.append(f"\n{'CBD COMPETENCY SCORES':─^60}")
+            lines.append("")
+            lines.append("CBD COMPETENCY RATINGS")
+            lines.append("-" * 70)
             for area, score in case['cbd_scores'].items():
                 if score:
-                    lines.append(f"• {area}: {score}")
+                    lines.append(f"{area}: {score}")
     
-    # CEX scores
     if case.get('cex_scores'):
         has_scores = any(score for score in case['cex_scores'].values())
         if has_scores:
-            lines.append(f"\n{'CEX COMPETENCY SCORES':─^60}")
+            lines.append("")
+            lines.append("CEX COMPETENCY RATINGS")
+            lines.append("-" * 70)
             for area, score in case['cex_scores'].items():
                 if score:
-                    lines.append(f"• {area}: {score}")
+                    lines.append(f"{area}: {score}")
     
-    # Reflection
+    # Reflection (key for portfolio)
     if case.get('reflection'):
-        lines.append(f"\n{'REFLECTION':─^60}")
+        lines.append("")
+        lines.append("REFLECTION")
+        lines.append("-" * 70)
         lines.append(case['reflection'])
     
-    # Learning
+    # Learning points (key for portfolio)
     if case.get('learning'):
-        lines.append(f"\n{'LEARNING POINTS':─^60}")
+        lines.append("")
+        lines.append("LEARNING POINTS")
+        lines.append("-" * 70)
         lines.append(case['learning'])
     
-    # Linked EPAs
+    # EPA/SLE links (important for curriculum mapping)
     if case.get('linked_to'):
-        lines.append(f"\n{'LINKED TO':─^60}")
-        lines.append(", ".join(case['linked_to']))
+        lines.append("")
+        lines.append("CURRICULUM LINKS")
+        lines.append("-" * 70)
+        for epa in case['linked_to']:
+            lines.append(f"• {epa}")
     
-    lines.append("\n" + "=" * 60)
+    lines.append("")
+    lines.append("=" * 70)
     lines.append("")
     
     return '\n'.join(lines)
@@ -985,15 +1002,16 @@ else:
             # Expandable details
             with st.expander("View Details"):
                 # Quick copy section at top
-                st.markdown("**📋 Quick Copy for ePortfolio:**")
+                st.markdown("**📋 Quick Copy for LLP (Lifelong Learning Platform):**")
+                st.info("💡 **Tip:** Copy this formatted text and paste directly into LLP's reflection/notes fields. Sections are clearly labeled for easy reference.")
                 case_export = format_case_for_export(case)
                 st.text_area(
                     "Copy this text to your ePortfolio:",
                     value=case_export,
-                    height=200,
+                    height=250,
                     key=f"copy_area_{case['id']}"
                 )
-                st.caption("👆 Click in the box above, Ctrl+A (select all), Ctrl+C (copy), then paste into your ePortfolio")
+                st.caption("👆 Click in box → Ctrl+A (select all) → Ctrl+C (copy) → Paste into LLP")
                 
                 st.markdown("---")
                 
