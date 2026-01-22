@@ -710,10 +710,10 @@ Provide a helpful, concise answer for my training level."""
             col1, col2 = st.columns(2)
             
             with col1:
-                age_category = st.selectbox(
+                age_category = st.text_input(
                     "Patient Age",
-                    [''] + AGE_CATEGORIES,
-                    index=AGE_CATEGORIES.index(existing_case.get('age_category', '')) + 1 if existing_case.get('age_category') in AGE_CATEGORIES else 0
+                    value=existing_case.get('age_category', ''),
+                    placeholder="e.g., 45y, 6m, 3 weeks"
                 )
             
             with col2:
