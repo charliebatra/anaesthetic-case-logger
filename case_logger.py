@@ -1,9 +1,192 @@
 import streamlit as st
 import pandas as pd
 import json
-from datetime import datetime, date
+from datetime import datetime, date, time as dt_time
 import os
 import requests
+import random
+
+# Initialize session state for authentication
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'pin' not in st.session_state:
+    st.session_state.pin = None
+
+def show_login():
+    """Show login screen with PIN"""
+    st.markdown("# 🔒 Anaesthetic Case Logger")
+    st.markdown("### Secure Login")
+    
+    # Check if PIN is set
+    pin_file = 'user_pin.json'
+    pin_exists = os.path.exists(pin_file)
+    
+    if not pin_exists:
+        st.info("👋 Welcome! Please set up your 4-digit PIN for secure access.")
+        col1, col2 = st.columns(2)
+        with col1:
+            new_pin = st.text_input("Create 4-digit PIN", type="password", max_chars=4, key="new_pin")
+        with col2:
+            confirm_pin = st.text_input("Confirm PIN", type="password", max_chars=4, key="confirm_pin")
+        
+        if st.button("Set PIN", type="primary"):
+            if len(new_pin) == 4 and new_pin.isdigit():
+                if new_pin == confirm_pin:
+                    with open(pin_file, 'w') as f:
+                        json.dump({'pin': new_pin}, f)
+                    st.success("✅ PIN set successfully! Please log in.")
+                    st.rerun()
+                else:
+                    st.error("PINs do not match!")
+            else:
+                st.error("PIN must be exactly 4 digits!")
+    else:
+        st.info("🔐 Enter your PIN to continue")
+        entered_pin = st.text_input("Enter PIN", type="password", max_chars=4, key="enter_pin")
+        
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if st.button("Login", type="primary"):
+                with open(pin_file, 'r') as f:
+                    stored_data = json.load(f)
+                
+                if entered_pin == stored_data['pin']:
+                    st.session_state.authenticated = True
+                    st.success("✅ Login successful!")
+                    st.rerun()
+                else:
+                    st.error("❌ Incorrect PIN!")
+        with col2:
+            if st.button("Reset PIN"):
+                if os.path.exists(pin_file):
+                    os.remove(pin_file)
+                st.info("PIN reset. Please set a new PIN.")
+                st.rerun()
+
+def check_smart_reminders():
+    """Check if it's reminder time (5pm-5:30pm) and show reminder"""
+    now = datetime.now()
+    current_time = now.time()
+    
+    # Check if between 5pm and 5:30pm
+    if dt_time(17, 0) <= current_time <= dt_time(17, 30):
+        # Check if we've already shown reminder today
+        reminder_key = f"reminder_shown_{now.date()}"
+        
+        if reminder_key not in st.session_state:
+            st.session_state[reminder_key] = True
+            
+            # Count incomplete cases
+            incomplete = [c for c in st.session_state.cases if not c.get('completed', False)]
+            
+            if incomplete:
+                st.warning(f"""
+                ### ⏰ End of Day Reminder
+                You have **{len(incomplete)} incomplete case(s)** to finish!
+                
+                **Why complete them now?**
+                - Details are fresh in your mind
+                - Takes just 2-3 minutes per case with AI helper
+                - Your portfolio stays up to date
+                
+                👉 Scroll down to complete them before you leave!
+                """)
+
+def generate_mcqs_from_cases():
+    """Generate Primary FRCA-style MCQs based on saved cases"""
+    st.markdown("## 📝 Primary FRCA Practice MCQs")
+    st.info("AI-generated MCQs based on YOUR logged cases - perfect for revision!")
+    
+    if not st.session_state.cases:
+        st.warning("No cases logged yet. Log some cases first to generate MCQs!")
+        return
+    
+    # Get cases with key clinical details
+    clinical_cases = [c for c in st.session_state.cases if c.get('notes') or c.get('procedure')]
+    
+    if not clinical_cases:
+        st.warning("No cases with clinical details. Add notes to your cases to generate better MCQs!")
+        return
+    
+    num_questions = st.slider("Number of questions to generate", 1, 10, 5)
+    
+    if st.button("🎲 Generate MCQs", type="primary"):
+        with st.spinner("Generating MCQs from your cases..."):
+            # Check if API key is available
+            if not st.session_state.get('anthropic_api_key'):
+                st.error("Please enter your Anthropic API key in the AI Assistant section first!")
+                return
+            
+            # Sample cases for MCQ generation
+            sampled_cases = random.sample(clinical_cases, min(num_questions, len(clinical_cases)))
+            
+            # Prepare context
+            cases_summary = []
+            for case in sampled_cases:
+                summary = f"Procedure: {case.get('procedure', 'Unknown')}, "
+                summary += f"ASA: {case.get('asa_grade', 'Unknown')}, "
+                summary += f"Notes: {case.get('notes', 'None')[:200]}"
+                cases_summary.append(summary)
+            
+            prompt = f"""Based on these anaesthetic cases, generate {num_questions} Primary FRCA-style MCQ questions (SBA format - one best answer from 5 options).
+
+Cases:
+{chr(10).join([f"{i+1}. {s}" for i, s in enumerate(cases_summary)])}
+
+For each question:
+1. Create a realistic clinical scenario based on the cases above
+2. Ask a question relevant to Primary FRCA (pharmacology, physiology, physics, clinical)
+3. Provide 5 options (A-E) with ONE best answer
+4. Include a brief explanation of the correct answer
+
+Format each question as:
+QUESTION X:
+[Clinical scenario and question]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
+E) [option]
+
+ANSWER: [Letter]
+EXPLANATION: [Brief explanation]
+
+---"""
+            
+            try:
+                response = requests.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": st.session_state.anthropic_api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    },
+                    json={
+                        "model": "claude-sonnet-4-20250514",
+                        "max_tokens": 4000,
+                        "messages": [{"role": "user", "content": prompt}]
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    mcqs_text = result['content'][0]['text']
+                    
+                    st.success(f"✅ Generated {num_questions} MCQs from your cases!")
+                    st.markdown("---")
+                    st.markdown(mcqs_text)
+                    
+                    # Download button
+                    st.download_button(
+                        "📥 Download MCQs",
+                        data=mcqs_text,
+                        file_name=f"frca_mcqs_{datetime.now().strftime('%Y%m%d')}.txt",
+                        mime="text/plain"
+                    )
+                else:
+                    st.error(f"Error generating MCQs: {response.status_code}")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
 
 # Page config
 st.set_page_config(
@@ -88,6 +271,14 @@ if 'cases' not in st.session_state:
             st.session_state.cases = json.load(f)
     else:
         st.session_state.cases = []
+
+# Check authentication - show login if not authenticated
+if not st.session_state.authenticated:
+    show_login()
+    st.stop()
+
+# Check for smart reminders (5pm-5:30pm)
+check_smart_reminders()
 
 if 'show_form' not in st.session_state:
     st.session_state.show_form = False
@@ -191,6 +382,297 @@ COMMON_PROCEDURES = [
     'Pre-operative Assessment',
     'Post-op Review'
 ]
+
+# Comprehensive surgical procedures for autocomplete
+SURGICAL_PROCEDURES = [
+    'Appendicectomy (open)',
+    'Appendicectomy (laparoscopic)',
+    'Laparoscopic cholecystectomy',
+    'Open cholecystectomy',
+    'Hernia repair (inguinal)',
+    'Hernia repair (umbilical)',
+    'Hernia repair (incisional)',
+    'Laparotomy (emergency)',
+    'Laparotomy (elective)',
+    'Bowel resection',
+    'Colectomy',
+    'Hartmann\'s procedure',
+    'Anterior resection',
+    'Small bowel resection',
+    'Perforated viscus repair',
+    'Hip replacement (total)',
+    'Hip replacement (hemi)',
+    'Knee replacement',
+    'ORIF (open reduction internal fixation)',
+    'Intramedullary nail',
+    'Fracture fixation',
+    'Dynamic hip screw',
+    'Trauma laparotomy',
+    'Caesarean section',
+    'Category 1 caesarean section',
+    'Category 2 caesarean section',
+    'Category 3 caesarean section',
+    'Category 4 caesarean section',
+    'Manual removal of placenta',
+    'Cervical cerclage',
+    'ERPC (evacuation retained products)',
+    'Hysterectomy (total abdominal)',
+    'Hysterectomy (vaginal)',
+    'Ovarian cystectomy',
+    'Salpingectomy',
+    'Diagnostic laparoscopy',
+    'Cystoscopy',
+    'TURP (transurethral resection prostate)',
+    'TURBT (transurethral resection bladder tumour)',
+    'Nephrectomy',
+    'Ureteric stent insertion',
+    'Percutaneous nephrolithotomy',
+    'Tonsillectomy',
+    'Adenoidectomy',
+    'Septoplasty',
+    'Microlaryngoscopy',
+    'Thyroidectomy',
+    'Parathyroidectomy',
+    'Mastectomy',
+    'Wide local excision (breast)',
+    'Axillary clearance',
+    'Sentinel lymph node biopsy',
+    'Varicose vein surgery',
+    'Carotid endarterectomy',
+    'AAA repair (open)',
+    'AAA repair (EVAR)',
+    'Fem-pop bypass',
+    'Embolectomy',
+    'Fasciotomy',
+    'Craniotomy',
+    'Burr holes',
+    'VP shunt insertion',
+    'Spinal decompression',
+    'Spinal fusion',
+    'Carpal tunnel decompression',
+    'Trigger finger release',
+    'Examination under anaesthesia (EUA)',
+    'Incision and drainage',
+    'Debridement',
+    'Skin graft',
+    'Dental extraction'
+]
+
+# EPA suggestions for different assessment types
+EPA_SUGGESTIONS = {
+    'cbd': {
+        'pre-operative assessment': ['EPA1 - Initial Assessment & Management', 'EPA2 - Pre-operative Assessment'],
+        'airway management': ['EPA1 - Initial Assessment & Management', 'EPA3 - Safe Conduct of Anaesthesia'],
+        'difficult airway': ['EPA1 - Initial Assessment & Management', 'EPA3 - Safe Conduct of Anaesthesia', 'EPA6 - Resuscitation & Transfer'],
+        'failed intubation': ['EPA1 - Initial Assessment & Management', 'EPA6 - Resuscitation & Transfer'],
+        'emergency case': ['EPA1 - Initial Assessment & Management', 'EPA3 - Safe Conduct of Anaesthesia'],
+        'post-operative care': ['EPA4 - Peri-operative Care', 'EPA5 - Managing Acute Pain'],
+        'pain management': ['EPA5 - Managing Acute Pain'],
+        'regional': ['EPA3 - Safe Conduct of Anaesthesia', 'EPA5 - Managing Acute Pain'],
+        'resuscitation': ['EPA6 - Resuscitation & Transfer'],
+        'transfer': ['EPA6 - Resuscitation & Transfer'],
+        'communication': ['EPA7 - General & Communication Skills'],
+        'default': ['EPA1 - Initial Assessment & Management', 'EPA7 - General & Communication Skills']
+    },
+    'cex': {
+        'pre-operative': ['EPA1 - Initial Assessment & Management', 'EPA2 - Pre-operative Assessment'],
+        'induction': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'maintenance': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'emergence': ['EPA3 - Safe Conduct of Anaesthesia', 'EPA4 - Peri-operative Care'],
+        'regional': ['EPA3 - Safe Conduct of Anaesthesia', 'EPA5 - Managing Acute Pain'],
+        'pain': ['EPA5 - Managing Acute Pain'],
+        'default': ['EPA3 - Safe Conduct of Anaesthesia']
+    },
+    'dops': {
+        'arterial line': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'central line': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'spinal': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'epidural': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'nerve block': ['EPA3 - Safe Conduct of Anaesthesia', 'EPA5 - Managing Acute Pain'],
+        'intubation': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'airway': ['EPA3 - Safe Conduct of Anaesthesia'],
+        'default': ['EPA3 - Safe Conduct of Anaesthesia']
+    },
+    'acat': {
+        'emergency': ['EPA1 - Initial Assessment & Management', 'EPA6 - Resuscitation & Transfer'],
+        'resuscitation': ['EPA6 - Resuscitation & Transfer'],
+        'trauma': ['EPA1 - Initial Assessment & Management', 'EPA6 - Resuscitation & Transfer'],
+        'default': ['EPA1 - Initial Assessment & Management']
+    }
+}
+
+SURGICAL_PROCEDURES = [
+    # General Surgery
+    'Laparoscopic Cholecystectomy',
+    'Open Cholecystectomy',
+    'Laparoscopic Appendicectomy',
+    'Open Appendicectomy',
+    'Inguinal Hernia Repair',
+    'Umbilical Hernia Repair',
+    'Incisional Hernia Repair',
+    'Laparoscopic Inguinal Hernia Repair',
+    'Emergency Laparotomy',
+    'Laparotomy',
+    'Hartmann\'s Procedure',
+    'Right Hemicolectomy',
+    'Left Hemicolectomy',
+    'Anterior Resection',
+    'Abdominoperineal Resection',
+    'Small Bowel Resection',
+    'Adhesiolysis',
+    'Gastrectomy',
+    'Oesophagectomy',
+    'Whipple\'s Procedure',
+    'Splenectomy',
+    'Thyroidectomy',
+    'Parathyroidectomy',
+    'Mastectomy',
+    'Wide Local Excision Breast',
+    'Varicose Vein Surgery',
+    
+    # Orthopaedics
+    'Dynamic Hip Screw (DHS)',
+    'Total Hip Replacement (THR)',
+    'Hemiarthroplasty Hip',
+    'Total Knee Replacement (TKR)',
+    'Knee Arthroscopy',
+    'ACL Reconstruction',
+    'Shoulder Arthroscopy',
+    'Rotator Cuff Repair',
+    'Carpal Tunnel Decompression',
+    'Trigger Finger Release',
+    'Manipulation Under Anaesthesia (MUA)',
+    'ORIF Ankle',
+    'ORIF Wrist',
+    'ORIF Humerus',
+    'ORIF Femur',
+    'Intramedullary Nail Femur',
+    'Intramedullary Nail Tibia',
+    'Spinal Fusion',
+    'Laminectomy',
+    'Discectomy',
+    
+    # Urology
+    'TURP (Transurethral Resection Prostate)',
+    'TURBT (Transurethral Resection Bladder Tumour)',
+    'Cystoscopy',
+    'Ureteroscopy',
+    'Nephrectomy',
+    'Partial Nephrectomy',
+    'Radical Prostatectomy',
+    'Circumcision',
+    'Orchidectomy',
+    'Orchidopexy',
+    'Vasectomy',
+    'Urethral Dilatation',
+    
+    # Gynaecology
+    'Caesarean Section',
+    'Laparoscopic Sterilisation',
+    'Laparoscopy + Dye Test',
+    'Hysterectomy (Abdominal)',
+    'Hysterectomy (Vaginal)',
+    'Hysterectomy (Laparoscopic)',
+    'Ovarian Cystectomy',
+    'Salpingectomy',
+    'Salpingo-oophorectomy',
+    'Myomectomy',
+    'Endometrial Ablation',
+    'Hysteroscopy',
+    'D&C (Dilation & Curettage)',
+    'ERPC (Evacuation Retained Products)',
+    'LLETZ',
+    'Colposcopy',
+    'Anterior/Posterior Repair',
+    'TVT/TOT Procedure',
+    
+    # Obstetrics
+    'Caesarean Section (Elective)',
+    'Caesarean Section (Emergency)',
+    'Manual Removal of Placenta',
+    'Examination Under Anaesthesia',
+    'Perineal Repair',
+    'Labour Epidural',
+    'Spinal for C-Section',
+    
+    # Vascular
+    'AAA Repair (Open)',
+    'EVAR (Endovascular Aneurysm Repair)',
+    'Carotid Endarterectomy',
+    'Femoral-Popliteal Bypass',
+    'AV Fistula Formation',
+    'Varicose Vein Surgery',
+    'Embolectomy',
+    'Amputation (Above Knee)',
+    'Amputation (Below Knee)',
+    
+    # ENT
+    'Tonsillectomy',
+    'Adenoidectomy',
+    'Septoplasty',
+    'FESS (Functional Endoscopic Sinus Surgery)',
+    'Microlaryngoscopy',
+    'Panendoscopy',
+    'Thyroidectomy',
+    'Neck Dissection',
+    'Myringotomy + Grommets',
+    'Mastoidectomy',
+    'Stapedectomy',
+    'Submandibular Gland Excision',
+    
+    # Maxillofacial
+    'Dental Extraction',
+    'Wisdom Teeth Extraction',
+    'Mandibular Fracture ORIF',
+    'Le Fort Fracture Repair',
+    'Zygoma Fracture ORIF',
+    'TMJ Arthroscopy',
+    
+    # Plastics
+    'Skin Graft',
+    'Flap Surgery',
+    'Carpal Tunnel Release',
+    'Dupuytren\'s Contracture Release',
+    'Hand Fracture ORIF',
+    'Burn Debridement',
+    'Breast Reconstruction',
+    'Cleft Lip Repair',
+    'Cleft Palate Repair',
+    
+    # Neurosurgery
+    'Craniotomy',
+    'Craniectomy',
+    'Burr Holes',
+    'EVD Insertion',
+    'VP Shunt',
+    'Spinal Decompression',
+    'Acoustic Neuroma Excision',
+    'Pituitary Surgery',
+    
+    # Cardiothoracic
+    'CABG (Coronary Artery Bypass Graft)',
+    'Valve Replacement',
+    'Valve Repair',
+    'ASD Closure',
+    'VSD Closure',
+    'Lobectomy',
+    'Pneumonectomy',
+    'VATS (Video-Assisted Thoracoscopic Surgery)',
+    'Mediastinoscopy',
+    'Pleurodesis',
+    'Chest Drain Insertion',
+    
+    # Paediatric
+    'Circumcision',
+    'Herniotomy',
+    'Orchidopexy',
+    'Hypospadias Repair',
+    'Pyloromyotomy',
+    'Intussusception Reduction',
+    'Appendicectomy',
+]
+
+ALL_PROCEDURES = COMMON_PROCEDURES + SURGICAL_PROCEDURES
 
 EPA_OPTIONS = [
     'EPA1 - Initial Assessment & Management',
@@ -334,6 +816,19 @@ Please write 2-3 specific learning points covering:
 
 Keep it concise and actionable."""
     return prompt
+
+def get_current_time_of_day():
+    """Get current time of day based on hour"""
+    from datetime import datetime
+    hour = datetime.now().hour
+    if 5 <= hour < 12:
+        return 'Morning'
+    elif 12 <= hour < 17:
+        return 'Afternoon'
+    elif 17 <= hour < 21:
+        return 'Evening'
+    else:
+        return 'Night'
 
 def save_data():
     """Save cases to JSON file"""
@@ -507,6 +1002,13 @@ def get_stats():
 # Main UI
 st.title("🏥 Anaesthetic Case Logger")
 st.markdown("*Quick capture for portfolio documentation*")
+
+# Add logout button in header
+col1, col2 = st.columns([4, 1])
+with col2:
+    if st.button("🔓 Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # Info about AI helper
 with st.expander("ℹ️ About the AI Helper"):
@@ -729,10 +1231,12 @@ Provide a helpful, concise answer for my training level."""
                 )
             
             with col2:
+                # Auto-fill time of day if new case
+                default_time = existing_case.get('time', '') if existing_case.get('time') else get_current_time_of_day()
                 time_of_day = st.selectbox(
                     "Time of Day",
-                    [''] + TIME_OF_DAY,
-                    index=TIME_OF_DAY.index(existing_case.get('time', '')) + 1 if existing_case.get('time') in TIME_OF_DAY else 0
+                    TIME_OF_DAY,
+                    index=TIME_OF_DAY.index(default_time) if default_time in TIME_OF_DAY else 0
                 )
             
             col1, col2 = st.columns(2)
@@ -785,24 +1289,23 @@ Provide a helpful, concise answer for my training level."""
                 index=CASE_TYPES.index(existing_case.get('case_type', '')) + 1 if existing_case.get('case_type') in CASE_TYPES else 0
             )
             
-            # Procedure with both dropdown suggestions and freetext
+            # Procedure with searchable dropdown
             st.markdown("**Procedure Performed**")
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                use_common_procedure = st.checkbox("Use common", value=existing_case.get('procedure') in COMMON_PROCEDURES if existing_case.get('procedure') else False, key="use_common_proc")
+            all_procedures = sorted(COMMON_PROCEDURES + SURGICAL_PROCEDURES)
+            procedure = st.selectbox(
+                "Select or type procedure (searchable)",
+                [''] + all_procedures + ['Other (type below)'],
+                index=all_procedures.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in all_procedures else 0,
+                label_visibility="collapsed",
+                help="Start typing to search procedures"
+            )
             
-            if use_common_procedure:
-                procedure = st.selectbox(
-                    "Select procedure",
-                    [''] + COMMON_PROCEDURES,
-                    index=COMMON_PROCEDURES.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in COMMON_PROCEDURES else 0,
-                    label_visibility="collapsed"
-                )
-            else:
+            # If "Other" selected, show text input
+            if procedure == 'Other (type below)':
                 procedure = st.text_input(
-                    "Enter procedure",
-                    value=existing_case.get('procedure', '') if existing_case.get('procedure') not in COMMON_PROCEDURES else '',
-                    placeholder="e.g., Emergency laparotomy for perforated bowel",
+                    "Enter procedure name",
+                    value=existing_case.get('procedure', '') if existing_case.get('procedure') not in all_procedures else '',
+                    placeholder="Type procedure name",
                     label_visibility="collapsed"
                 )
             
@@ -884,6 +1387,33 @@ Provide a helpful, concise answer for my training level."""
             )
             
             st.markdown("**Link to EPAs/SLEs**")
+            
+            # Show EPA suggestions for assessments (not clinical cases)
+            if st.session_state.assessment_type != 'case':
+                suggested_epas = []
+                assessment_type = st.session_state.assessment_type
+                
+                # Get suggestions based on procedure and notes
+                search_text = (procedure + ' ' + notes).lower()
+                
+                if assessment_type in EPA_SUGGESTIONS:
+                    suggestions_map = EPA_SUGGESTIONS[assessment_type]
+                    
+                    # Check for keywords
+                    for keyword, epas in suggestions_map.items():
+                        if keyword in search_text:
+                            suggested_epas.extend(epas)
+                    
+                    # If no matches, use default
+                    if not suggested_epas and 'default' in suggestions_map:
+                        suggested_epas = suggestions_map['default']
+                    
+                    # Remove duplicates
+                    suggested_epas = list(dict.fromkeys(suggested_epas))
+                    
+                    if suggested_epas:
+                        st.info(f"💡 **Suggested EPAs based on this {assessment_type.upper()}:** {', '.join(suggested_epas)}")
+            
             linked_to = []
             cols = st.columns(2)
             for idx, epa in enumerate(EPA_OPTIONS):
@@ -1076,6 +1606,11 @@ else:
                     st.markdown("**Linked to:**")
                     for epa in case['linked_to']:
                         st.markdown(f'<span class="epa-tag">{epa}</span>', unsafe_allow_html=True)
+
+# MCQ Generator Section
+st.markdown("---")
+with st.expander("📝 Generate Practice MCQs from Your Cases"):
+    generate_mcqs_from_cases()
 
 st.markdown("---")
 st.markdown("""
