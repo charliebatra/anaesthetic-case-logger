@@ -105,6 +105,30 @@ if 'assessment_type' not in st.session_state:
     st.session_state.assessment_type = 'case'
 
 # Constants
+URGENCY_TYPES = [
+    'Elective',
+    'Urgent',
+    'Emergency',
+    'Immediate/Resus'
+]
+
+OPERATION_TYPES = [
+    'General Surgery',
+    'Orthopaedic',
+    'Vascular',
+    'Urology',
+    'Gynaecology',
+    'Obstetric',
+    'ENT',
+    'Maxillofacial',
+    'Plastics',
+    'Neurosurgery',
+    'Cardiac',
+    'Thoracic',
+    'Paediatric',
+    'Other'
+]
+
 CASE_TYPES = [
     'Emergency - Trauma',
     'Emergency - Non-trauma',
@@ -343,6 +367,12 @@ def format_case_for_export(case):
         patient_details.append(f"ASA {case['asa_grade']}")
     if patient_details:
         lines.append(f"Patient: {', '.join(patient_details)}")
+    
+    # Urgency and operation type
+    if case.get('urgency'):
+        lines.append(f"Urgency: {case['urgency']}")
+    if case.get('operation_type'):
+        lines.append(f"Operation Type: {case['operation_type']}")
     
     # Case type and procedure
     if case.get('case_type'):
@@ -661,17 +691,48 @@ Provide a helpful, concise answer for my training level."""
                     index=ASA_GRADES.index(existing_case.get('asa_grade', '')) + 1 if existing_case.get('asa_grade') in ASA_GRADES else 0
                 )
             
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                urgency = st.selectbox(
+                    "Urgency",
+                    [''] + URGENCY_TYPES,
+                    index=URGENCY_TYPES.index(existing_case.get('urgency', '')) + 1 if existing_case.get('urgency') in URGENCY_TYPES else 0
+                )
+            
+            with col2:
+                operation_type = st.selectbox(
+                    "Operation Type",
+                    [''] + OPERATION_TYPES,
+                    index=OPERATION_TYPES.index(existing_case.get('operation_type', '')) + 1 if existing_case.get('operation_type') in OPERATION_TYPES else 0
+                )
+            
             case_type = st.selectbox(
-                "Case Type",
+                "Case Type (optional)",
                 [''] + CASE_TYPES,
                 index=CASE_TYPES.index(existing_case.get('case_type', '')) + 1 if existing_case.get('case_type') in CASE_TYPES else 0
             )
             
-            procedure = st.selectbox(
-                "Procedure/Technique",
-                [''] + COMMON_PROCEDURES,
-                index=COMMON_PROCEDURES.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in COMMON_PROCEDURES else 0
-            )
+            # Procedure with both dropdown suggestions and freetext
+            st.markdown("**Procedure Performed**")
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                use_common_procedure = st.checkbox("Use common", value=existing_case.get('procedure') in COMMON_PROCEDURES if existing_case.get('procedure') else False, key="use_common_proc")
+            
+            if use_common_procedure:
+                procedure = st.selectbox(
+                    "Select procedure",
+                    [''] + COMMON_PROCEDURES,
+                    index=COMMON_PROCEDURES.index(existing_case.get('procedure', '')) + 1 if existing_case.get('procedure') in COMMON_PROCEDURES else 0,
+                    label_visibility="collapsed"
+                )
+            else:
+                procedure = st.text_input(
+                    "Enter procedure",
+                    value=existing_case.get('procedure', '') if existing_case.get('procedure') not in COMMON_PROCEDURES else '',
+                    placeholder="e.g., Emergency laparotomy for perforated bowel",
+                    label_visibility="collapsed"
+                )
             
             supervisor = st.text_input(
                 "Supervisor",
@@ -777,6 +838,8 @@ Provide a helpful, concise answer for my training level."""
                     'time': case_time.strftime('%H:%M') if case_time else '',
                     'age_category': age_category,
                     'asa_grade': asa_grade,
+                    'urgency': urgency,
+                    'operation_type': operation_type,
                     'case_type': case_type,
                     'procedure': procedure,
                     'supervisor': supervisor,
@@ -845,7 +908,8 @@ else:
                         {case.get('procedure', 'Unknown Procedure')}
                     </h3>
                     <p style="color: #6b7280; font-size: 0.9rem; margin: 0.25rem 0;">
-                        {case.get('case_type', '')} • {case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
+                        {case.get('urgency', '')}{'  •  ' if case.get('urgency') and case.get('operation_type') else ''}{case.get('operation_type', '')}
+                        {' • ' if (case.get('urgency') or case.get('operation_type')) and case.get('age_category') else ''}{case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
                         {' • ' + case.get('supervisor', '') if case.get('supervisor') else ''}
                     </p>
                 </div>
