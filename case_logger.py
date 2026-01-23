@@ -1374,6 +1374,42 @@ Provide a helpful, concise answer for my training level."""
                 else:
                     st.warning("Please enter a question!")
         
+        # Specialty selector OUTSIDE form for dynamic updates
+        st.markdown("---")
+        st.markdown("**🏥 Select Surgical Specialty** (this will filter the procedure dropdown below)")
+        
+        # Get existing specialty if editing
+        existing_specialty = ''
+        if st.session_state.editing_id:
+            existing_case = next((c for c in st.session_state.cases if c['id'] == st.session_state.editing_id), {})
+            existing_specialty = existing_case.get('operation_type', '')
+        
+        specialty = st.selectbox(
+            "Surgical Specialty",
+            [''] + SPECIALTIES + ['Anaesthetic Procedure', 'Other'],
+            index=SPECIALTIES.index(existing_specialty) + 1 if existing_specialty in SPECIALTIES else (
+                len(SPECIALTIES) + 1 if existing_specialty == 'Anaesthetic Procedure' else (
+                    len(SPECIALTIES) + 2 if existing_specialty == 'Other' else 0
+                )
+            ),
+            help="Select specialty to filter procedures below",
+            key="specialty_selector"
+        )
+        
+        # Store in session state for use in form
+        st.session_state['selected_specialty'] = specialty
+        
+        # Show which procedures will be available
+        if specialty == 'Anaesthetic Procedure':
+            st.info(f"📋 Procedure dropdown will show: Anaesthetic procedures (lines, blocks, airway management)")
+        elif specialty and specialty != 'Other' and specialty in PROCEDURES_BY_SPECIALTY:
+            num_procs = len(PROCEDURES_BY_SPECIALTY[specialty])
+            st.info(f"📋 Procedure dropdown will show: {num_procs} {specialty} procedures")
+        elif specialty == 'Other':
+            st.info(f"📋 Procedure dropdown will show: All 170+ procedures")
+        else:
+            st.warning("⚠️ Please select a specialty above to see available procedures")
+        
         with st.form("case_form"):
             col1, col2 = st.columns(2)
             
@@ -1418,19 +1454,14 @@ Provide a helpful, concise answer for my training level."""
                 )
             
             with col2:
-                # Specialty selector (replaces operation_type, now stored as operation_type for backward compatibility)
-                specialty = st.selectbox(
-                    "Surgical Specialty",
-                    [''] + SPECIALTIES + ['Anaesthetic Procedure', 'Other'],
-                    index=SPECIALTIES.index(existing_case.get('operation_type', '')) + 1 if existing_case.get('operation_type') in SPECIALTIES else (
-                        len(SPECIALTIES) + 1 if existing_case.get('operation_type') == 'Anaesthetic Procedure' else (
-                            len(SPECIALTIES) + 2 if existing_case.get('operation_type') == 'Other' else 0
-                        )
-                    ),
-                    help="Select specialty to filter procedures"
-                )
-                # Store as operation_type for compatibility
+                # Use specialty from session state (selected outside form)
+                specialty = st.session_state.get('selected_specialty', '')
                 operation_type = specialty
+                
+                # Show selected specialty (read-only)
+                st.markdown("**Surgical Specialty**")
+                specialty_display = specialty if specialty else "(Select above form)"
+                st.info(f"Selected: **{specialty_display}**")
             
             anaesthetic_type = st.selectbox(
                 "Anaesthetic Type",
