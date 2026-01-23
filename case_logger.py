@@ -93,7 +93,7 @@ def check_smart_reminders():
                 """)
 
 def generate_mcqs_from_cases():
-    """Generate Primary FRCA-style MCQs based on saved cases"""
+    """Generate Primary FRCA-style MCQs based on saved cases - IMPROVED VERSION"""
     st.markdown("## 📝 Primary FRCA Practice MCQs")
     st.info("AI-generated MCQs based on YOUR logged cases - perfect for revision!")
     
@@ -101,12 +101,33 @@ def generate_mcqs_from_cases():
         st.warning("No cases logged yet. Log some cases first to generate MCQs!")
         return
     
-    # Get cases with key clinical details
-    clinical_cases = [c for c in st.session_state.cases if c.get('notes') or c.get('procedure')]
+    # IMPROVED: Get cases with ANY clinical information from ANY field
+    clinical_cases = []
+    for c in st.session_state.cases:
+        # Collect ALL text from the case
+        case_text = ' '.join(str(v) for v in [
+            c.get('notes', ''),
+            c.get('procedure', ''),
+            c.get('reflection', ''),
+            c.get('learning', ''),
+            c.get('operation_type', ''),
+            c.get('anaesthetic_type', ''),
+            c.get('case_type', ''),
+            c.get('urgency', ''),
+            c.get('asa_grade', ''),
+            c.get('age_category', ''),
+            c.get('supervision_level', '')
+        ] if v)
+        
+        # Include if there's ANY meaningful content
+        if len(case_text.strip()) > 10:  # At least 10 characters of content
+            clinical_cases.append(c)
     
     if not clinical_cases:
-        st.warning("No cases with clinical details. Add notes to your cases to generate better MCQs!")
+        st.warning("No cases with sufficient detail found. Add more details to your cases to generate better MCQs!")
         return
+    
+    st.success(f"✅ Found {len(clinical_cases)} cases with clinical information!")
     
     num_questions = st.slider("Number of questions to generate", 1, 10, 5)
     
@@ -120,22 +141,60 @@ def generate_mcqs_from_cases():
             # Sample cases for MCQ generation
             sampled_cases = random.sample(clinical_cases, min(num_questions, len(clinical_cases)))
             
-            # Prepare context
+            # IMPROVED: Prepare context with ALL available information
             cases_summary = []
             for case in sampled_cases:
-                summary = f"Procedure: {case.get('procedure', 'Unknown')}, "
-                summary += f"ASA: {case.get('asa_grade', 'Unknown')}, "
-                summary += f"Notes: {case.get('notes', 'None')[:200]}"
-                cases_summary.append(summary)
+                summary_parts = []
+                
+                # Assessment type
+                assessment_type = case.get('assessment_type', 'case')
+                if assessment_type != 'case':
+                    summary_parts.append(f"Assessment: {ASSESSMENT_TYPES.get(assessment_type, assessment_type)}")
+                
+                # Core details
+                if case.get('procedure'):
+                    summary_parts.append(f"Procedure: {case['procedure']}")
+                if case.get('operation_type'):
+                    summary_parts.append(f"Specialty: {case['operation_type']}")
+                if case.get('anaesthetic_type'):
+                    summary_parts.append(f"Anaesthetic: {case['anaesthetic_type']}")
+                if case.get('urgency'):
+                    summary_parts.append(f"Urgency: {case['urgency']}")
+                if case.get('age_category'):
+                    summary_parts.append(f"Patient: {case['age_category']}")
+                if case.get('asa_grade'):
+                    summary_parts.append(f"ASA: {case['asa_grade']}")
+                if case.get('supervision_level'):
+                    summary_parts.append(f"Role: {case['supervision_level']}")
+                
+                # Clinical content
+                if case.get('notes'):
+                    summary_parts.append(f"Notes: {case['notes'][:300]}")
+                if case.get('reflection'):
+                    summary_parts.append(f"Reflection: {case['reflection'][:200]}")
+                if case.get('learning'):
+                    summary_parts.append(f"Learning: {case['learning'][:200]}")
+                
+                # CBD/CEX scores
+                if case.get('cbd_scores'):
+                    scores_text = ', '.join([f"{k}: {v}" for k, v in case['cbd_scores'].items() if v])
+                    if scores_text:
+                        summary_parts.append(f"CBD scores: {scores_text}")
+                if case.get('cex_scores'):
+                    scores_text = ', '.join([f"{k}: {v}" for k, v in case['cex_scores'].items() if v])
+                    if scores_text:
+                        summary_parts.append(f"CEX scores: {scores_text}")
+                
+                cases_summary.append(' | '.join(summary_parts))
             
-            prompt = f"""Based on these anaesthetic cases, generate {num_questions} Primary FRCA-style MCQ questions (SBA format - one best answer from 5 options).
+            prompt = f"""Based on these anaesthetic cases from my clinical practice, generate {num_questions} Primary FRCA-style MCQ questions (SBA format - one best answer from 5 options).
 
-Cases:
+My Cases:
 {chr(10).join([f"{i+1}. {s}" for i, s in enumerate(cases_summary)])}
 
 For each question:
 1. Create a realistic clinical scenario based on the cases above
-2. Ask a question relevant to Primary FRCA (pharmacology, physiology, physics, clinical)
+2. Ask a question relevant to Primary FRCA (pharmacology, physiology, physics, clinical anaesthesia)
 3. Provide 5 options (A-E) with ONE best answer
 4. Include a brief explanation of the correct answer
 
@@ -248,6 +307,10 @@ st.markdown("""
     .badge-incomplete {
         background: #fef3c7;
         color: #92400e;
+    }
+    .badge-exported {
+        background: #dbeafe;
+        color: #1e40af;
     }
     .epa-tag {
         display: inline-block;
@@ -1018,6 +1081,14 @@ def toggle_complete(case_id):
             break
     save_data()
 
+def toggle_exported(case_id):
+    """Toggle case exported status - NEW FUNCTION"""
+    for case in st.session_state.cases:
+        if case['id'] == case_id:
+            case['exported'] = not case.get('exported', False)
+            break
+    save_data()
+
 def export_cases(cases_to_export):
     """Export cases to text format"""
     output = []
@@ -1662,7 +1733,8 @@ Provide a helpful, concise answer for my training level."""
                     'reflection': reflection,
                     'learning': learning,
                     'linked_to': linked_to,
-                    'completed': completed
+                    'completed': completed,
+                    'exported': existing_case.get('exported', False)  # Preserve exported status
                 }
                 
                 # Add assessment-specific scores
@@ -1697,6 +1769,7 @@ if not filtered_cases:
     st.info("📋 No cases to display. Start by adding your first case above!")
 else:
     for case in filtered_cases:
+        # IMPROVED: Ensure consistent display for ALL case types
         # Create a clean case card using native Streamlit components
         card_color = "#f0f0f0" if case.get('completed', False) else "#ffffff"
         border_color = "#10b981" if case.get('completed', False) else "#667eea"
@@ -1706,17 +1779,28 @@ else:
             
             with col1:
                 # Date and badges
-                status_text = "✅ Complete" if case.get('completed', False) else "⏳ To Finish"
+                status_badges = []
+                if case.get('completed', False):
+                    status_badges.append("✅ Complete")
+                else:
+                    status_badges.append("⏳ To Finish")
+                
+                # NEW: Add exported badge
+                if case.get('exported', False):
+                    status_badges.append("📥 Exported")
+                
                 assessment_label = ASSESSMENT_TYPES.get(case.get('assessment_type', 'case'), 'Clinical Case')
                 
                 date_display = case['date']
                 if case.get('time'):
                     date_display += f" ({case.get('time')})"
                 
-                st.markdown(f"**{date_display}** &nbsp;&nbsp; {status_text} &nbsp;&nbsp; *{assessment_label}*")
+                badges_text = " &nbsp;&nbsp; ".join(status_badges)
+                st.markdown(f"**{date_display}** &nbsp;&nbsp; {badges_text} &nbsp;&nbsp; *{assessment_label}*")
                 
-                # Procedure name (bold and larger)
-                st.markdown(f"### {case.get('procedure', 'Unknown Procedure')}")
+                # IMPROVED: Always show procedure/title prominently for ALL case types
+                procedure_display = case.get('procedure', 'Procedure not specified')
+                st.markdown(f"### {procedure_display}")
                 
                 # Case details in a clean line
                 details = []
@@ -1745,28 +1829,36 @@ else:
                     st.caption(" • ".join(supervision_line))
             
             with col2:
-                col_a, col_b, col_c, col_d, col_e = st.columns(5)
+                # IMPROVED: Add exported toggle button
+                col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
                 with col_a:
                     if st.button("✓", key=f"complete_{case['id']}", help="Toggle complete"):
                         toggle_complete(case['id'])
                         st.rerun()
                 with col_b:
+                    # NEW: Exported toggle button
+                    exported_icon = "📥" if case.get('exported', False) else "⬜"
+                    if st.button(exported_icon, key=f"export_toggle_{case['id']}", help="Mark as exported"):
+                        toggle_exported(case['id'])
+                        st.rerun()
+                with col_c:
                     if st.button("✏️", key=f"edit_{case['id']}", help="Edit case"):
                         st.session_state.editing_id = case['id']
                         st.session_state.show_form = True
                         st.rerun()
-                with col_c:
+                with col_d:
                     if st.button("📋", key=f"duplicate_{case['id']}", help="Duplicate case"):
                         # Create a duplicate with new ID and date
                         duplicate = case.copy()
                         duplicate['id'] = int(datetime.now().timestamp() * 1000)
                         duplicate['date'] = date.today().isoformat()
                         duplicate['completed'] = False
+                        duplicate['exported'] = False  # Reset exported status
                         st.session_state.cases.append(duplicate)
                         save_data()
                         st.success("Case duplicated! Edit the new case to update details.")
                         st.rerun()
-                with col_d:
+                with col_e:
                     # Export this case button
                     case_export = format_case_for_export(case)
                     st.download_button(
@@ -1777,12 +1869,12 @@ else:
                         key=f"export_{case['id']}",
                         help="Export this case"
                     )
-                with col_e:
+                with col_f:
                     if st.button("🗑️", key=f"delete_{case['id']}", help="Delete case"):
                         delete_case(case['id'])
                         st.rerun()
             
-            # Expandable details
+            # IMPROVED: Always show expandable details for ALL cases
             with st.expander("View Details"):
                 # Quick copy section at top
                 st.markdown("**📋 Quick Copy for LLP (Lifelong Learning Platform):**")
