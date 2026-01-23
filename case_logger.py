@@ -1697,41 +1697,52 @@ if not filtered_cases:
     st.info("📋 No cases to display. Start by adding your first case above!")
 else:
     for case in filtered_cases:
+        # Create a clean case card using native Streamlit components
+        card_color = "#f0f0f0" if case.get('completed', False) else "#ffffff"
+        border_color = "#10b981" if case.get('completed', False) else "#667eea"
+        
         with st.container():
-            # Case card
-            card_class = "case-card case-complete" if case.get('completed', False) else "case-card"
-            
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([5, 1])
             
             with col1:
-                status_badge = "complete" if case.get('completed', False) else "incomplete"
-                status_text = "Complete" if case.get('completed', False) else "To Finish"
+                # Date and badges
+                status_text = "✅ Complete" if case.get('completed', False) else "⏳ To Finish"
                 assessment_label = ASSESSMENT_TYPES.get(case.get('assessment_type', 'case'), 'Clinical Case')
                 
-                st.markdown(f"""
-                <div class="{card_class}">
-                    <div style="margin-bottom: 0.5rem;">
-                        <span style="color: #667eea; font-weight: 600; font-size: 0.9rem;">
-                            {case['date']}{' (' + case.get('time', '') + ')' if case.get('time') else ''}
-                        </span>
-                        <span class="badge badge-{status_badge}">{status_text}</span>
-                        <span style="background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; margin-left: 0.5rem;">
-                            {assessment_label}
-                        </span>
-                    </div>
-                    <h3 style="margin: 0.5rem 0; font-size: 1.25rem; color: #1f2937;">
-                        {case.get('procedure', 'Unknown Procedure')}
-                    </h3>
-                    <p style="color: #6b7280; font-size: 0.9rem; margin: 0.25rem 0;">
-                        {case.get('urgency', '')}{'  •  ' if case.get('urgency') and case.get('operation_type') else ''}{case.get('operation_type', '')}
-                        {' • ' if case.get('anaesthetic_type') and (case.get('urgency') or case.get('operation_type')) else ''}{case.get('anaesthetic_type', '')}
-                        {' • ' if (case.get('urgency') or case.get('operation_type') or case.get('anaesthetic_type')) and case.get('age_category') else ''}{case.get('age_category', '')} • ASA {case.get('asa_grade', '')}
-                    </p>
-                    <p style="color: #6b7280; font-size: 0.85rem; margin: 0.25rem 0; font-style: italic;">
-                        {case.get('supervision_level', '')}{' • ' if case.get('supervision_level') and case.get('supervisor') else ''}{case.get('supervisor', '')}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                date_display = case['date']
+                if case.get('time'):
+                    date_display += f" ({case.get('time')})"
+                
+                st.markdown(f"**{date_display}** &nbsp;&nbsp; {status_text} &nbsp;&nbsp; *{assessment_label}*")
+                
+                # Procedure name (bold and larger)
+                st.markdown(f"### {case.get('procedure', 'Unknown Procedure')}")
+                
+                # Case details in a clean line
+                details = []
+                if case.get('urgency'):
+                    details.append(case['urgency'])
+                if case.get('operation_type'):
+                    details.append(case['operation_type'])
+                if case.get('anaesthetic_type'):
+                    details.append(case['anaesthetic_type'])
+                if case.get('age_category'):
+                    details.append(case['age_category'])
+                if case.get('asa_grade'):
+                    details.append(f"ASA {case['asa_grade']}")
+                
+                if details:
+                    st.markdown(" • ".join(details))
+                
+                # Supervision and supervisor
+                supervision_line = []
+                if case.get('supervision_level'):
+                    supervision_line.append(case['supervision_level'])
+                if case.get('supervisor'):
+                    supervision_line.append(case['supervisor'])
+                
+                if supervision_line:
+                    st.caption(" • ".join(supervision_line))
             
             with col2:
                 col_a, col_b, col_c, col_d, col_e = st.columns(5)
@@ -1817,6 +1828,9 @@ else:
                     st.markdown("**Linked to:**")
                     for epa in case['linked_to']:
                         st.markdown(f'<span class="epa-tag">{epa}</span>', unsafe_allow_html=True)
+            
+            # Add separator line between cases
+            st.markdown("---")
 
 # MCQ Generator Section
 st.markdown("---")
