@@ -1935,3 +1935,4 @@ st.markdown("""
     Data stored locally in case_logger_data.json. Export regularly to backup your cases.
 </div>
 """, unsafe_allow_html=True)
+
