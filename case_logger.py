@@ -6,63 +6,6 @@ import os
 import requests
 import random
 
-# Initialize session state for authentication
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'pin' not in st.session_state:
-    st.session_state.pin = None
-
-def show_login():
-    """Show login screen with PIN"""
-    st.markdown("# 🔒 Anaesthetic Case Logger")
-    st.markdown("### Secure Login")
-    
-    # Check if PIN is set
-    pin_file = 'user_pin.json'
-    pin_exists = os.path.exists(pin_file)
-    
-    if not pin_exists:
-        st.info("👋 Welcome! Please set up your 4-digit PIN for secure access.")
-        col1, col2 = st.columns(2)
-        with col1:
-            new_pin = st.text_input("Create 4-digit PIN", type="password", max_chars=4, key="new_pin")
-        with col2:
-            confirm_pin = st.text_input("Confirm PIN", type="password", max_chars=4, key="confirm_pin")
-        
-        if st.button("Set PIN", type="primary"):
-            if len(new_pin) == 4 and new_pin.isdigit():
-                if new_pin == confirm_pin:
-                    with open(pin_file, 'w') as f:
-                        json.dump({'pin': new_pin}, f)
-                    st.success("✅ PIN set successfully! Please log in.")
-                    st.rerun()
-                else:
-                    st.error("PINs do not match!")
-            else:
-                st.error("PIN must be exactly 4 digits!")
-    else:
-        st.info("🔐 Enter your PIN to continue")
-        entered_pin = st.text_input("Enter PIN", type="password", max_chars=4, key="enter_pin")
-        
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            if st.button("Login", type="primary"):
-                with open(pin_file, 'r') as f:
-                    stored_data = json.load(f)
-                
-                if entered_pin == stored_data['pin']:
-                    st.session_state.authenticated = True
-                    st.success("✅ Login successful!")
-                    st.rerun()
-                else:
-                    st.error("❌ Incorrect PIN!")
-        with col2:
-            if st.button("Reset PIN"):
-                if os.path.exists(pin_file):
-                    os.remove(pin_file)
-                st.info("PIN reset. Please set a new PIN.")
-                st.rerun()
-
 def check_smart_reminders():
     """Check if it's reminder time (5pm-5:30pm) and show reminder"""
     now = datetime.now()
@@ -334,11 +277,6 @@ if 'cases' not in st.session_state:
             st.session_state.cases = json.load(f)
     else:
         st.session_state.cases = []
-
-# Check authentication - show login if not authenticated
-if not st.session_state.authenticated:
-    show_login()
-    st.stop()
 
 # Check for smart reminders (5pm-5:30pm)
 check_smart_reminders()
@@ -998,39 +936,44 @@ def call_claude_api(prompt, max_tokens=1000):
 
 def generate_reflection_prompt(case_data):
     """Generate a prompt for Claude to help write reflection"""
-    prompt = f"""I'm an anaesthetic CT1 trainee documenting a case for my portfolio. Can you help me write a reflection?
+    prompt = f"""I'm an anaesthetic CT1 trainee documenting this case for my professional portfolio.
 
 Case details:
 - Type: {case_data.get('case_type', 'Not specified')}
 - Procedure: {case_data.get('procedure', 'Not specified')}
 - Patient: {case_data.get('age_category', 'Not specified')}, ASA {case_data.get('asa_grade', 'Not specified')}
-- Notes: {case_data.get('notes', 'Not specified')}
+- Clinical notes: {case_data.get('notes', 'Not specified')}
 
-Please write a concise clinical reflection (3-4 sentences) covering:
-1. What happened and what I did
-2. Key clinical decisions or considerations
-3. Any challenges or interesting aspects
+Write a thoughtful, prose-based reflection (4-5 sentences) demonstrating deep clinical insight:
 
-Keep it professional and suitable for a portfolio."""
+1. Open with the clinical context and what made this case notable
+2. Explore the clinical decision-making - what considerations shaped my approach, what alternatives existed, and the rationale for my choices
+3. Discuss any challenges, unexpected findings, or significant learning moments with analysis of their importance
+4. Reflect on how this experience influences my clinical practice going forward
+
+Write in first person using flowing prose. Show genuine clinical maturity and thoughtful analysis, not just description. The reflection should read like the work of a reflective practitioner engaged in continuous professional development."""
     return prompt
 
 def generate_learning_prompt(case_data):
     """Generate a prompt for Claude to help write learning points"""
-    prompt = f"""I'm an anaesthetic CT1 trainee documenting a case for my portfolio. Can you help me write learning points?
+    prompt = f"""I'm an anaesthetic CT1 trainee documenting this case for my professional portfolio.
 
 Case details:
 - Type: {case_data.get('case_type', 'Not specified')}
 - Procedure: {case_data.get('procedure', 'Not specified')}
 - Patient: {case_data.get('age_category', 'Not specified')}, ASA {case_data.get('asa_grade', 'Not specified')}
-- Notes: {case_data.get('notes', 'Not specified')}
-- Reflection: {case_data.get('reflection', 'Not specified')}
+- Clinical notes: {case_data.get('notes', 'Not specified')}
+- Previous reflection: {case_data.get('reflection', 'Not specified')}
 
-Please write 2-3 specific learning points covering:
-1. What I learned or consolidated
-2. What I'd do differently or what to review
-3. Practical takeaways for future cases
+Write insightful learning points as flowing prose (one paragraph, 5-6 sentences) demonstrating sophisticated clinical thinking:
 
-Keep it concise and actionable."""
+1. Begin by identifying what this case reinforced or revealed about my clinical practice
+2. Discuss specific knowledge gaps exposed and concrete plans to address them (particular guidelines, papers, topics, skills)
+3. Explore how I might approach similar cases differently in future, with clear rationale
+4. Connect this experience to broader principles of safe anaesthetic practice
+5. End with specific, actionable next steps for my professional development
+
+Write in first person with genuine clinical insight. Be specific and thoughtful - avoid generic statements. Show evidence of deep reflection and commitment to continuous improvement."""
     return prompt
 
 def get_current_time_of_day():
@@ -1227,13 +1170,6 @@ def get_stats():
 st.title("🏥 Anaesthetic Case Logger")
 st.markdown("*Quick capture for portfolio documentation*")
 
-# Add logout button in header
-col1, col2 = st.columns([4, 1])
-with col2:
-    if st.button("🔓 Logout"):
-        st.session_state.authenticated = False
-        st.rerun()
-
 # Info about AI helper
 with st.expander("ℹ️ About the AI Helper"):
     st.markdown("""
@@ -1398,12 +1334,20 @@ if st.session_state.show_form:
                 if st.button("✨ Generate Reflection", use_container_width=True):
                     if st.session_state.get('ai_case_summary') or st.session_state.get('ai_notes_input'):
                         with st.spinner("🤖 Claude is writing..."):
-                            prompt = f"""I'm an anaesthetic CT1 trainee documenting: {st.session_state.get('ai_case_summary', 'a clinical case')}
+                            prompt = f"""I'm an anaesthetic CT1 trainee documenting this case for my professional portfolio: {st.session_state.get('ai_case_summary', 'a clinical case')}
 
-Key details: {st.session_state.get('ai_notes_input', 'not specified')}
+Clinical context: {st.session_state.get('ai_notes_input', 'not specified')}
 
-Write a concise professional reflection (3-4 sentences) covering what happened, clinical decisions, and any challenges."""
-                            ai_text = call_claude_api(prompt)
+Write a thoughtful, prose-based reflection (4-5 sentences) that demonstrates deep clinical thinking. The reflection should:
+
+1. Open with the clinical context and what made this case notable or challenging
+2. Explore the clinical decision-making process - what considerations influenced my approach, what alternatives I weighed, and why I chose the path I did
+3. Discuss any unexpected findings, complications, or learning moments with insight into their significance
+4. Reflect on how this experience has shaped my clinical practice or understanding
+5. Write in first person, using flowing prose rather than bullet points
+
+The tone should be professional yet reflective, showing genuine clinical insight and thoughtful analysis rather than just describing what happened. Make it clear this is my own learning journey."""
+                            ai_text = call_claude_api(prompt, max_tokens=600)
                             st.success("✨ Generated Reflection:")
                             st.code(ai_text, language=None)
                             st.caption("Copy this text ☝️ and paste into the Reflection field below")
@@ -1414,12 +1358,20 @@ Write a concise professional reflection (3-4 sentences) covering what happened, 
                 if st.button("✨ Generate Learning Points", use_container_width=True):
                     if st.session_state.get('ai_case_summary') or st.session_state.get('ai_notes_input'):
                         with st.spinner("🤖 Claude is writing..."):
-                            prompt = f"""I'm an anaesthetic CT1 trainee documenting: {st.session_state.get('ai_case_summary', 'a clinical case')}
+                            prompt = f"""I'm an anaesthetic CT1 trainee documenting this case: {st.session_state.get('ai_case_summary', 'a clinical case')}
 
-Key details: {st.session_state.get('ai_notes_input', 'not specified')}
+Clinical context: {st.session_state.get('ai_notes_input', 'not specified')}
 
-Write 2-3 specific learning points: what I learned, what to review, practical takeaways."""
-                            ai_text = call_claude_api(prompt)
+Write insightful learning points as flowing prose (one paragraph, 5-6 sentences) that demonstrates sophisticated clinical thinking. The learning should:
+
+1. Begin by identifying what this case has reinforced or revealed about my clinical practice
+2. Discuss specific knowledge gaps this case exposed and how I plan to address them (specific guidelines, papers, or topics to review)
+3. Explore how I might approach similar cases differently in future, with rationale
+4. Connect this experience to broader principles of anaesthetic practice or patient safety
+5. End with actionable next steps for my development
+
+Write in first person with genuine insight. Avoid generic statements - be specific about what I learned and why it matters. Show clinical maturity and thoughtful self-reflection rather than just listing facts to memorize."""
+                            ai_text = call_claude_api(prompt, max_tokens=600)
                             st.success("✨ Generated Learning Points:")
                             st.code(ai_text, language=None)
                             st.caption("Copy this text ☝️ and paste into the Learning Points field below")
@@ -1433,13 +1385,22 @@ Write 2-3 specific learning points: what I learned, what to review, practical ta
             if st.button("🤖 Ask Claude", use_container_width=True):
                 if custom_q:
                     with st.spinner("🤖 Thinking..."):
-                        prompt = f"""I'm an anaesthetic CT1 trainee. Case: {st.session_state.get('ai_case_summary', 'not specified')}
-Details: {st.session_state.get('ai_notes_input', 'not specified')}
+                        prompt = f"""I'm an anaesthetic CT1 trainee reflecting on this case:
+
+Case summary: {st.session_state.get('ai_case_summary', 'not specified')}
+Clinical details: {st.session_state.get('ai_notes_input', 'not specified')}
 
 Question: {custom_q}
 
-Provide a helpful, concise answer for my training level."""
-                        ai_answer = call_claude_api(prompt, max_tokens=600)
+Provide a thoughtful, insightful answer appropriate for a CT1 trainee that:
+- Demonstrates clinical reasoning and explains the 'why' behind concepts
+- References relevant guidelines or evidence where appropriate
+- Connects theory to practical application
+- Highlights key safety considerations or pearls of wisdom
+- Encourages deeper thinking about the topic
+
+Write in a teaching style that's educational but not condescending. Help me understand the clinical principles and how to apply them."""
+                        ai_answer = call_claude_api(prompt, max_tokens=800)
                         st.success("🤖 Claude's Answer:")
                         st.write(ai_answer)
                 else:
@@ -1775,104 +1736,101 @@ else:
         border_color = "#10b981" if case.get('completed', False) else "#667eea"
         
         with st.container():
-            col1, col2 = st.columns([5, 1])
+            # Date and badges
+            status_badges = []
+            if case.get('completed', False):
+                status_badges.append("✅ Complete")
+            else:
+                status_badges.append("⏳ To Finish")
             
-            with col1:
-                # Date and badges
-                status_badges = []
-                if case.get('completed', False):
-                    status_badges.append("✅ Complete")
-                else:
-                    status_badges.append("⏳ To Finish")
-                
-                # NEW: Add exported badge
-                if case.get('exported', False):
-                    status_badges.append("📥 Exported")
-                
-                assessment_label = ASSESSMENT_TYPES.get(case.get('assessment_type', 'case'), 'Clinical Case')
-                
-                date_display = case['date']
-                if case.get('time'):
-                    date_display += f" ({case.get('time')})"
-                
-                badges_text = " &nbsp;&nbsp; ".join(status_badges)
-                st.markdown(f"**{date_display}** &nbsp;&nbsp; {badges_text} &nbsp;&nbsp; *{assessment_label}*")
-                
-                # IMPROVED: Always show procedure/title prominently for ALL case types
-                procedure_display = case.get('procedure', 'Procedure not specified')
-                st.markdown(f"### {procedure_display}")
-                
-                # Case details in a clean line
-                details = []
-                if case.get('urgency'):
-                    details.append(case['urgency'])
-                if case.get('operation_type'):
-                    details.append(case['operation_type'])
-                if case.get('anaesthetic_type'):
-                    details.append(case['anaesthetic_type'])
-                if case.get('age_category'):
-                    details.append(case['age_category'])
-                if case.get('asa_grade'):
-                    details.append(f"ASA {case['asa_grade']}")
-                
-                if details:
-                    st.markdown(" • ".join(details))
-                
-                # Supervision and supervisor
-                supervision_line = []
-                if case.get('supervision_level'):
-                    supervision_line.append(case['supervision_level'])
-                if case.get('supervisor'):
-                    supervision_line.append(case['supervisor'])
-                
-                if supervision_line:
-                    st.caption(" • ".join(supervision_line))
+            # NEW: Add exported badge
+            if case.get('exported', False):
+                status_badges.append("📥 Exported")
             
-            with col2:
-                # IMPROVED: Add exported toggle button
-                col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
-                with col_a:
-                    if st.button("✓", key=f"complete_{case['id']}", help="Toggle complete"):
-                        toggle_complete(case['id'])
-                        st.rerun()
-                with col_b:
-                    # NEW: Exported toggle button
-                    exported_icon = "📥" if case.get('exported', False) else "⬜"
-                    if st.button(exported_icon, key=f"export_toggle_{case['id']}", help="Mark as exported"):
-                        toggle_exported(case['id'])
-                        st.rerun()
-                with col_c:
-                    if st.button("✏️", key=f"edit_{case['id']}", help="Edit case"):
-                        st.session_state.editing_id = case['id']
-                        st.session_state.show_form = True
-                        st.rerun()
-                with col_d:
-                    if st.button("📋", key=f"duplicate_{case['id']}", help="Duplicate case"):
-                        # Create a duplicate with new ID and date
-                        duplicate = case.copy()
-                        duplicate['id'] = int(datetime.now().timestamp() * 1000)
-                        duplicate['date'] = date.today().isoformat()
-                        duplicate['completed'] = False
-                        duplicate['exported'] = False  # Reset exported status
-                        st.session_state.cases.append(duplicate)
-                        save_data()
-                        st.success("Case duplicated! Edit the new case to update details.")
-                        st.rerun()
-                with col_e:
-                    # Export this case button
-                    case_export = format_case_for_export(case)
-                    st.download_button(
-                        label="📄",
-                        data=case_export,
-                        file_name=f"case_{case['date']}_{case.get('procedure', 'case').replace(' ', '_')}.txt",
-                        mime="text/plain",
-                        key=f"export_{case['id']}",
-                        help="Export this case"
-                    )
-                with col_f:
-                    if st.button("🗑️", key=f"delete_{case['id']}", help="Delete case"):
-                        delete_case(case['id'])
-                        st.rerun()
+            assessment_label = ASSESSMENT_TYPES.get(case.get('assessment_type', 'case'), 'Clinical Case')
+            
+            date_display = case['date']
+            if case.get('time'):
+                date_display += f" ({case.get('time')})"
+            
+            badges_text = " &nbsp;&nbsp; ".join(status_badges)
+            st.markdown(f"**{date_display}** &nbsp;&nbsp; {badges_text} &nbsp;&nbsp; *{assessment_label}*")
+            
+            # IMPROVED: Always show procedure/title prominently for ALL case types
+            procedure_display = case.get('procedure', 'Procedure not specified')
+            st.markdown(f"### {procedure_display}")
+            
+            # Case details in a clean line
+            details = []
+            if case.get('urgency'):
+                details.append(case['urgency'])
+            if case.get('operation_type'):
+                details.append(case['operation_type'])
+            if case.get('anaesthetic_type'):
+                details.append(case['anaesthetic_type'])
+            if case.get('age_category'):
+                details.append(case['age_category'])
+            if case.get('asa_grade'):
+                details.append(f"ASA {case['asa_grade']}")
+            
+            if details:
+                st.markdown(" • ".join(details))
+            
+            # Supervision and supervisor
+            supervision_line = []
+            if case.get('supervision_level'):
+                supervision_line.append(case['supervision_level'])
+            if case.get('supervisor'):
+                supervision_line.append(case['supervisor'])
+            
+            if supervision_line:
+                st.caption(" • ".join(supervision_line))
+            
+            # IMPROVED: Action buttons in horizontal row beneath case details
+            col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
+            with col_a:
+                if st.button("✓", key=f"complete_{case['id']}", help="Toggle complete", use_container_width=True):
+                    toggle_complete(case['id'])
+                    st.rerun()
+            with col_b:
+                # NEW: Exported toggle button
+                exported_icon = "📥" if case.get('exported', False) else "⬜"
+                if st.button(exported_icon, key=f"export_toggle_{case['id']}", help="Mark as exported", use_container_width=True):
+                    toggle_exported(case['id'])
+                    st.rerun()
+            with col_c:
+                if st.button("✏️", key=f"edit_{case['id']}", help="Edit case", use_container_width=True):
+                    st.session_state.editing_id = case['id']
+                    st.session_state.show_form = True
+                    st.rerun()
+            with col_d:
+                if st.button("📋", key=f"duplicate_{case['id']}", help="Duplicate case", use_container_width=True):
+                    # Create a duplicate with new ID and date
+                    duplicate = case.copy()
+                    duplicate['id'] = int(datetime.now().timestamp() * 1000)
+                    duplicate['date'] = date.today().isoformat()
+                    duplicate['completed'] = False
+                    duplicate['exported'] = False  # Reset exported status
+                    st.session_state.cases.append(duplicate)
+                    save_data()
+                    st.success("Case duplicated! Edit the new case to update details.")
+                    st.rerun()
+            with col_e:
+                # Export this case button
+                case_export = format_case_for_export(case)
+                st.download_button(
+                    label="📄",
+                    data=case_export,
+                    file_name=f"case_{case['date']}_{case.get('procedure', 'case').replace(' ', '_')}.txt",
+                    mime="text/plain",
+                    key=f"export_{case['id']}",
+                    help="Export this case",
+                    use_container_width=True
+                )
+            with col_f:
+                if st.button("🗑️", key=f"delete_{case['id']}", help="Delete case", use_container_width=True):
+                    delete_case(case['id'])
+                    st.rerun()
             
             # IMPROVED: Always show expandable details for ALL cases
             with st.expander("View Details"):
@@ -1935,4 +1893,3 @@ st.markdown("""
     Data stored locally in case_logger_data.json. Export regularly to backup your cases.
 </div>
 """, unsafe_allow_html=True)
-
